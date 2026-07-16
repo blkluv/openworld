@@ -1,7 +1,7 @@
 import type { Map as MlMap } from 'maplibre-gl';
 import { RIDE_PITCH, RIDE_ZOOM } from './style';
 import { RoadNetwork } from './roads';
-import { EngineSound } from './engineSound';
+import { EngineSound } from './EngineSound'; // ✅ fixed
 
 export interface BikeState {
   lng: number;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
-import { nearestCityName, type Destination } from '../cities';
+import { nearestCityName, type Destination } from '../data/cities';
 import { STYLE_URL } from '../lib/style';
 
 interface Props {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useContext } from 'react';
 import maplibregl from 'maplibre-gl';
-import type { Destination } from '../cities';
+import type { Destination } from '../data/cities';
 import { RIDE_PITCH, RIDE_ZOOM, STYLE_URL } from '../lib/style';
 import { BikeController, type BikeState } from '../lib/BikeController';
 import { AvatarLayer } from '../lib/avatarLayer';
