@@ -4,7 +4,7 @@ import type { Destination } from '../cities';
 import { RIDE_PITCH, RIDE_ZOOM, STYLE_URL } from '../lib/style';
 import { BikeController, type BikeState } from '../lib/BikeController';
 import { AvatarLayer } from '../lib/avatarLayer';
-import { AudioManagerContext } from '../App'; // <-- NEW: import the context
+import { AudioManagerContext } from '../App';
 
 interface Props {
   dest: Destination;
@@ -18,30 +18,39 @@ export default function City({ dest, onBack }: Props) {
   const [ready, setReady] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
 
-  // NEW: get audio manager from context
   const { manager, initManager } = useContext(AudioManagerContext);
-
-  // NEW: state to store current position (for recording)
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
-
-  // NEW: ref to hold the engine sound instance from the controller
   const engineRef = useRef<any>(null);
 
+  // --- Sound toggle ---
   const toggleSound = () => {
     const next = !soundOn;
     setSoundOn(next);
     controllerRef.current?.setSoundEnabled(next);
   };
 
-  // NEW: handler for the record button
-  const handleRecord = async () => {
+  // --- Record Audio ---
+  const handleRecordAudio = async () => {
     if (!manager || !position) {
       console.warn('Manager or position not ready');
       return;
     }
-    await manager.recordPin(position.lat, position.lng);
+    await manager.recordAudioPin(position.lat, position.lng);
   };
 
+  // --- Record Video (TikTok) ---
+  const handleRecordVideo = async () => {
+    if (!manager || !position) {
+      console.warn('Manager or position not ready');
+      return;
+    }
+    const url = prompt('Paste a TikTok video URL:');
+    if (url && url.trim()) {
+      await manager.recordVideoPin(position.lat, position.lng, url.trim());
+    }
+  };
+
+  // --- Initialize map & BikeController ---
   useEffect(() => {
     if (!ref.current) return;
 
@@ -62,19 +71,17 @@ export default function City({ dest, onBack }: Props) {
       map.resize();
       const controller2 = new BikeController(map, dest.center, (s: BikeState) => {
         setSpeed(Math.abs(s.speed));
-        // NEW: also store the current position (assuming BikeState has lat/lng)
-        // If BikeState doesn't have it, we'll get it from controller2.getPosition() below
+        // Update position if BikeState includes lat/lng – otherwise fallback below
       });
       controller = controller2;
       controllerRef.current = controller2;
 
-      // --- NEW: hook up the audio manager ---
-      // 1. Get the engine sound instance from the controller (assume it's public)
-      const engine = (controller2 as any).engine; // or .sound, .audioEngine, etc.
+      // Hook up audio manager with engine
+      const engine = (controller2 as any).engine;
       if (engine && engine.ctx) {
         engineRef.current = engine;
         initManager(engine.ctx, engine);
-        console.log('🎧 Audio manager initialized with engine');
+        console.log('🎧 Audio manager initialized');
       } else {
         console.warn('Engine sound not found on BikeController');
       }
@@ -91,25 +98,32 @@ export default function City({ dest, onBack }: Props) {
     };
   }, [dest, initManager]);
 
-  // --- NEW: Poll position from controller and check proximity ---
+  // --- Poll position and check proximity ---
   useEffect(() => {
     if (!ready || !manager) return;
 
     const interval = setInterval(() => {
       const ctrl = controllerRef.current;
       if (!ctrl) return;
-      // Assume BikeController has a method getPosition() returning { lat, lng }
-      // If not, you can expose it or use the position from the callback above.
-      // For now, we'll try to get it via a method:
-      const pos = (ctrl as any).getPosition?.(); // fallback
+      const pos = (ctrl as any).getPosition?.();
       if (pos) {
         setPosition(pos);
         manager.checkProximity(pos.lat, pos.lng);
       }
-    }, 2000); // check every 2 seconds
+    }, 2000);
 
     return () => clearInterval(interval);
   }, [ready, manager]);
+
+  // --- Get pin count for the current city (if dest.name matches a city) ---
+  const getPinCount = () => {
+    if (!manager) return 0;
+    const cityPins = manager.getPinsByCity();
+    // Try to match by city name – if dest.name is a city name, use that.
+    // Otherwise, fallback to 'Other' or total.
+    const key = Object.keys(cityPins).find(k => dest.name.includes(k) || k.includes(dest.name));
+    return key ? cityPins[key].length : 0;
+  };
 
   return (
     <div className="view">
@@ -128,10 +142,9 @@ export default function City({ dest, onBack }: Props) {
 
       <div className="hud hud-top">
         <h2>{dest.name}</h2>
-        {/* NEW: show pin count if manager is ready */}
         {manager && ready && (
           <span style={{ fontSize: '0.9rem', marginLeft: '1rem' }}>
-            📌 {Object.values(manager.getPinsByCity()).reduce((acc, arr) => acc + arr.length, 0)} stories
+            📌 {getPinCount()} story{getPinCount() !== 1 ? 's' : ''}
           </span>
         )}
       </div>
@@ -147,29 +160,46 @@ export default function City({ dest, onBack }: Props) {
         </div>
       )}
 
-      {/* NEW: Record button (appears when ready) */}
+      {/* Record buttons */}
       {ready && manager && position && (
-        <button
-          onClick={handleRecord}
-          style={{
-            position: 'fixed',
-            bottom: '80px',
-            right: '20px',
-            zIndex: 50,
-            backgroundColor: '#e53935',
-            color: 'white',
-            border: 'none',
-            borderRadius: '50%',
-            width: '70px',
-            height: '70px',
-            fontSize: '30px',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
-            cursor: 'pointer',
-          }}
-          title="Record an audio story at this location"
-        >
-          🎙️
-        </button>
+        <div style={{ position: 'fixed', bottom: '80px', right: '20px', zIndex: 50, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* Audio record button */}
+          <button
+            onClick={handleRecordAudio}
+            style={{
+              backgroundColor: '#e53935',
+              color: 'white',
+              border: 'none',
+              borderRadius: '50%',
+              width: '60px',
+              height: '60px',
+              fontSize: '28px',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
+              cursor: 'pointer',
+            }}
+            title="Record an audio story at this location"
+          >
+            🎙️
+          </button>
+          {/* Video record button */}
+          <button
+            onClick={handleRecordVideo}
+            style={{
+              backgroundColor: '#1DA1F2',
+              color: 'white',
+              border: 'none',
+              borderRadius: '50%',
+              width: '60px',
+              height: '60px',
+              fontSize: '28px',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
+              cursor: 'pointer',
+            }}
+            title="Paste a TikTok video URL for this location"
+          >
+            🎥
+          </button>
+        </div>
       )}
     </div>
   );
