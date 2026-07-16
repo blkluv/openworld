@@ -1,6 +1,5 @@
-// utils/AudioPinManager.ts
-import { nearestCityName } from '../data/cities';
-import { EngineSound } from '../path-to/EngineSound';
+import { nearestCityName } from '../cities'; // <-- fixed path
+import { EngineSound } from '../lib/EngineSound'; // <-- fixed path
 
 type Pin = {
   id: string;
@@ -9,7 +8,7 @@ type Pin = {
   city: string | null;
   audioBlob: Blob | null;
   videoUrl: string | null;
-  threeWords: string | null;  // now from rwatok.land
+  threeWords: string | null;
   played: boolean;
   timestamp: number;
 };
@@ -20,9 +19,9 @@ export class AudioPinManager {
   private ctx: AudioContext;
   private engine: EngineSound;
 
-  // --- Replace with your actual rwatok.land API key ---
-  private readonly RWATOK_API_KEY = 'YOUR_RWATOK_API_KEY'; // <-- SET THIS
-  private readonly RWATOK_API_URL = 'https://api.rwatok.land/v1/convert-to-3wa'; // example endpoint
+  // Optional rwatok.land API – set if you have a key
+  private readonly RWATOK_API_KEY = 'YOUR_RWATOK_API_KEY';
+  private readonly RWATOK_API_URL = 'https://api.rwatok.land/v1/convert-to-3wa';
 
   constructor(ctx: AudioContext, engine: EngineSound) {
     this.ctx = ctx;
@@ -30,7 +29,6 @@ export class AudioPinManager {
     this.loadFromIndexedDB();
   }
 
-  // --- RECORD AUDIO PIN ---
   async recordAudioPin(lat: number, lng: number) {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const mediaRecorder = new MediaRecorder(stream);
@@ -61,9 +59,7 @@ export class AudioPinManager {
     setTimeout(() => mediaRecorder.stop(), 10000);
   }
 
-  // --- RECORD VIDEO PIN (TikTok) ---
   async recordVideoPin(lat: number, lng: number, videoUrl: string) {
-    // Allow any TikTok URL (short or long)
     if (!videoUrl.includes('tiktok.com')) {
       console.warn('Only TikTok URLs are supported.');
       return;
@@ -86,7 +82,6 @@ export class AudioPinManager {
     console.log(`📹 Video pin saved in ${city || 'Unknown'} – rwatok: ${threeWords || 'N/A'}`);
   }
 
-  // --- PROXIMITY CHECK ---
   checkProximity(currentLat: number, currentLng: number) {
     this.pins.forEach(async (pin) => {
       if (pin.played) return;
@@ -99,7 +94,6 @@ export class AudioPinManager {
     });
   }
 
-  // --- PLAYBACK ---
   private async playPin(pin: Pin) {
     try {
       this.engine.duck(0.03, 20);
@@ -132,9 +126,7 @@ export class AudioPinManager {
     }
   }
 
-  // --- VIDEO POPUP (works with ANY TikTok URL) ---
   private async showVideoPopup(url: string, city: string | null, threeWords: string | null) {
-    // Resolve the embeddable video ID from the share URL
     const embedUrl = await this.getTikTokEmbedUrl(url);
     if (!embedUrl) {
       console.warn('Could not resolve TikTok video.');
@@ -149,7 +141,6 @@ export class AudioPinManager {
       padding: 8px; transition: all 0.3s;
     `;
 
-    // Label with city + rwatok.land 3‑word address
     const label = document.createElement('div');
     label.style.cssText = `
       color: #fff; padding: 8px 12px; font-size: 14px; font-family: sans-serif;
@@ -158,7 +149,6 @@ export class AudioPinManager {
     label.textContent = `${city || 'Unknown'} ${threeWords ? '· ' + threeWords : ''}`;
     container.appendChild(label);
 
-    // TikTok embed iframe
     const iframe = document.createElement('iframe');
     iframe.src = embedUrl;
     iframe.width = '100%';
@@ -168,7 +158,6 @@ export class AudioPinManager {
     iframe.allow = 'encrypted-media; picture-in-picture; fullscreen';
     container.appendChild(iframe);
 
-    // Close button
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '✕';
     closeBtn.style.cssText = `
@@ -190,55 +179,33 @@ export class AudioPinManager {
     }, 20000);
   }
 
-  // --- TikTok URL Resolver (handles short URLs like /t/ZT9MKFdXC7SUy-dVF7u/) ---
   private async getTikTokEmbedUrl(url: string): Promise<string | null> {
     try {
-      // Option 1: Use TikTok's oEmbed API to get the embed URL
       const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
       const res = await fetch(oembedUrl);
       if (!res.ok) {
-        // Fallback: try to extract video ID from the URL
         const videoId = this.extractVideoIdFromUrl(url);
-        if (videoId) {
-          return `https://www.tiktok.com/embed/v2/${videoId}`;
-        }
-        return null;
+        return videoId ? `https://www.tiktok.com/embed/v2/${videoId}` : null;
       }
       const data = await res.json();
-      // The oEmbed returns an `embed_url` that we can use directly
-      if (data.embed_url) {
-        return data.embed_url;
-      }
-      // If not, try to get the video_id
-      if (data.video_id) {
-        return `https://www.tiktok.com/embed/v2/${data.video_id}`;
-      }
+      if (data.embed_url) return data.embed_url;
+      if (data.video_id) return `https://www.tiktok.com/embed/v2/${data.video_id}`;
       return null;
     } catch {
-      // Fallback: manual extraction
       const videoId = this.extractVideoIdFromUrl(url);
       return videoId ? `https://www.tiktok.com/embed/v2/${videoId}` : null;
     }
   }
 
   private extractVideoIdFromUrl(url: string): string | null {
-    // Handle short URLs: e.g., https://www.tiktok.com/t/ZT9MKFdXC7SUy-dVF7u/
     const shortMatch = url.match(/\/t\/([A-Za-z0-9\-_]+)/);
-    if (shortMatch) {
-      // For short URLs, we need to fetch the oEmbed anyway to get the numeric ID
-      // But we can return the short code as a fallback – TikTok's embed might not like it.
-      // Better to use the oEmbed method above. Let's return null and force oEmbed.
-      return null;
-    }
-    // Standard long URL: /video/123456789
+    if (shortMatch) return null; // force oEmbed for short URLs
     const longMatch = url.match(/\/video\/(\d+)/);
     return longMatch ? longMatch[1] : null;
   }
 
-  // --- rwatok.land 3‑word address fetcher ---
   private async fetchRwatokAddress(lng: number, lat: number): Promise<string | null> {
     if (!this.RWATOK_API_KEY || this.RWATOK_API_KEY === 'YOUR_RWATOK_API_KEY') {
-      console.warn('rwatok.land API key not configured – skipping 3‑word lookup.');
       return null;
     }
     try {
@@ -246,19 +213,16 @@ export class AudioPinManager {
       const res = await fetch(url);
       if (!res.ok) return null;
       const data = await res.json();
-      // Adjust the property name to whatever rwatok.land returns (e.g., `words`, `address`, `threeWords`)
       return data.words || data.address || null;
     } catch {
       return null;
     }
   }
 
-  // --- GET PINS BY 3‑WORD ADDRESS ---
   getPinsByThreeWord(threeWords: string): Pin[] {
     return this.pins.filter(p => p.threeWords === threeWords);
   }
 
-  // --- GET PINS BY CITY ---
   getPinsByCity(): Record<string, Pin[]> {
     const map: Record<string, Pin[]> = {};
     this.pins.forEach(p => {
@@ -269,12 +233,18 @@ export class AudioPinManager {
     return map;
   }
 
-  // --- INDEXEDDB (unchanged) ---
+  // --- FIXED: IndexedDB save with Promise (replaces tx.done) ---
   private async saveToIndexedDB(pin: Pin) {
     const db = await this.openDB();
-    const tx = db.transaction('pins', 'readwrite');
-    tx.objectStore('pins').put(pin);
-    return tx.done;
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('pins', 'readwrite');
+      const store = tx.objectStore('pins');
+      const request = store.put(pin);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+      tx.onerror = () => reject(tx.error);
+      tx.oncomplete = () => resolve();
+    });
   }
 
   private async loadFromIndexedDB() {
@@ -283,6 +253,7 @@ export class AudioPinManager {
     const all = await new Promise<Pin[]>((res) => {
       const req = tx.objectStore('pins').getAll();
       req.onsuccess = () => res(req.result || []);
+      req.onerror = () => res([]);
     });
     this.pins = all;
   }
