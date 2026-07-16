@@ -2,7 +2,7 @@ import { useState, createContext, useRef } from 'react';
 import Globe from './components/Globe';
 import City from './components/City';
 import type { Destination } from './cities';
-import { AudioPinManager } from './utils/AudioPinManager';
+import { AudioPinManager } from './lib/AudioPinManager';
 import { EngineSound } from './lib/EngineSound'; // <-- corrected path
 import './App.css';
 
