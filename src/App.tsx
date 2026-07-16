@@ -1,9 +1,9 @@
 import { useState, createContext, useRef } from 'react';
 import Globe from './components/Globe';
 import City from './components/City';
-import type { Destination } from './cities';
+import type { Destination } from './data/cities';
 import { AudioPinManager } from './lib/AudioPinManager';
-import { EngineSound } from './lib/EngineSound'; // <-- corrected path
+import { EngineSound } from './lib/EngineSound';
 import './App.css';
 
 export const AudioManagerContext = createContext<{
