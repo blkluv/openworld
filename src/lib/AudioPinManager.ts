@@ -1,4 +1,5 @@
-import { nearestCityName } from '../cities'; 
+
+import { nearestCityName } from '../data/cities';
 import { EngineSound } from './EngineSound';
 
 type Pin = {
