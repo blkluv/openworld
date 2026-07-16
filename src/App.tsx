@@ -17,7 +17,7 @@ export const AudioManagerContext = createContext<{
 export default function App() {
   const [dest, setDest] = useState<Destination | null>({
     center: [-84.37196, 33.75513],
-    name: 'MLK Home, Atlanta',
+    name: 'STORY.CREMARKET.IO',
   });
 
   const managerRef = useRef<AudioPinManager | null>(null);
