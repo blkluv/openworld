@@ -3,7 +3,7 @@ import Globe from './components/Globe';
 import City from './components/City';
 import type { Destination } from './cities';
 import { AudioPinManager } from './utils/AudioPinManager';
-import { EngineSound } from './utils/EngineSound'; // Adjust path if needed
+import { EngineSound } from './utils/EngineSound';
 import './App.css';
 
 // 1. Create a Context so City can access the audio features
@@ -16,7 +16,12 @@ export const AudioManagerContext = createContext<{
 });
 
 export default function App() {
-  const [dest, setDest] = useState<Destination | null>(null);
+  // 🔥 DEFAULT: Load directly into MLK Home, Atlanta
+  const [dest, setDest] = useState<Destination | null>({
+    center: [-84.37196, 33.75513], // MLK Birth Home – 501 Auburn Ave NE, Atlanta, GA
+    name: 'MLK Home, Atlanta',
+  });
+
   const managerRef = useRef<AudioPinManager | null>(null);
 
   // 2. This function is called by City.tsx when the engine is ready
