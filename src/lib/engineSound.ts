@@ -19,6 +19,9 @@ export class EngineSound {
   private enabled = true;
   private lastRpm = 0.28;
 
+  // --- NEW: store the current “normal” volume to restore after ducking ---
+  private normalVolume = 0;
+
   /** Build ~0.5 s of looping engine pulses. */
   private buildBuffer(ctx: AudioContext): AudioBuffer {
     const sr = ctx.sampleRate;
@@ -124,7 +127,33 @@ export class EngineSound {
     this.src.playbackRate.setTargetAtTime(rate, now, 0.08);
     this.filter.frequency.setTargetAtTime(320 + rpm * 1500, now, 0.1);
     const vol = this.enabled ? (throttle ? 0.16 : 0.085) + rpm * 0.05 : 0;
+    // Store the normal volume so duck() can restore it later
+    this.normalVolume = vol;
     this.gain.gain.setTargetAtTime(vol, now, 0.1);
+  }
+
+  /**
+   * Temporarily duck the engine volume to let another audio source (e.g. a voice pin)
+   * be heard clearly. The volume is reduced to `level` over a short ramp, and after
+   * `duration` seconds it is restored to the normal level (which will be overridden
+   * by the next call to `update()` anyway).
+   *
+   * @param level  volume to duck to (default 0.04, very quiet)
+   * @param duration  seconds to stay ducked before restoring (default 1.2)
+   */
+  duck(level: number = 0.04, duration: number = 1.2) {
+    if (!this.gain || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    // Duck quickly
+    this.gain.gain.setTargetAtTime(level, now, 0.05);
+    // After `duration`, restore to the normal volume (as last computed)
+    // Use a longer ramp for a smooth transition back.
+    setTimeout(() => {
+      if (this.gain && this.ctx) {
+        // Restore to the stored normal volume; `update()` will override it anyway
+        this.gain.gain.setTargetAtTime(this.normalVolume, this.ctx.currentTime, 0.15);
+      }
+    }, duration * 1000);
   }
 
   stop() {
